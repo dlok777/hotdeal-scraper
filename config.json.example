@@ -1,0 +1,8 @@
+{
+  "host": "your-database-host",
+  "user": "your-database-user", 
+  "password": "your-database-password",
+  "database": "your-database-name",
+  "access_key_id": "your-aws-access-key-id",
+  "secret_access_key": "your-aws-secret-access-key"
+}
