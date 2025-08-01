@@ -2,6 +2,7 @@ const fetch = require('node-fetch');
 const cheerio = require("cheerio");
 const iconv = require('iconv-lite');
 const BaseCrawler = require('./BaseCrawler');
+const fs = require('fs');
 
 /**
  * 뽐뿌 사이트 크롤러 클래스
@@ -47,13 +48,15 @@ class Ppomppu extends BaseCrawler {
 
         // 제목 정리: 대괄호 및 가격 정보 제거
         title = this._cleanTitle(title);
+        let categoryTitle = $(item).find('.baseList-small').text().trim().replace(/[\[\]]/g, '');
 
         const productData = {
           id: productId,
-          title: title,
+          // title: title,
           seller: seller,
-          thumbnail: thumbnail,
-          category: category
+          // thumbnail: thumbnail,
+          category: category,
+          categoryTitle: categoryTitle
         };
 
         products.push(productData);  
@@ -87,30 +90,52 @@ class Ppomppu extends BaseCrawler {
       const comment = $("#comment").text().trim();
       let title = $("#topTitle h1").text().trim()
         .replace(categoryTitle, "").trim()
-        .replace(comment, "").trim();
       
       const productLink = $(".topTitle-link a").attr('href') || $(".topTitle-link a").text().trim();
       
-      // 가격 정보 추출 (다양한 가격 형태 지원)
-      let priceMatch = title.match(/(\d{1,3}(?:,\d{3})*)원/) || // 35,750원
-                       title.match(/\((\d{1,3}(?:,\d{3})*)[\/,)]/) || // (35,750/) 또는 (35,750,) 또는 (35,750)
-                       title.match(/(\d{1,3}(?:,\d{3})*)[\/\s]/) || // 35,750/ 또는 35,750 
-                       title.match(/(\d{1,3}(?:,\d{3})*)/); // 마지막 대안: 그냥 숫자
-      const price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : 0;
+                    // 가격 정보 추출 (다양한 가격 형태 지원)
+       let priceMatch = title.match(/(\d{1,3}(?:,\d{3})*)\s*원/) || // 35,750원, 9,000 원
+                        title.match(/(\d+)만원/) || // 24만원
+                        title.match(/\((\d{1,3}(?:,\d{3})*)[\/,)]/); // (35,750/) 또는 (35,750,) 또는 (35,750)
+       
+       let price = 0;
+       if (priceMatch) {
+         let priceStr = priceMatch[1].replace(/,/g, '');
+         
+          // 만원 단위 처리
+         if (title.includes('만원')) {
+            price = parseInt(priceStr) * 10000;
+         } else {
+            // 39,00 같은 경우 39,000으로 해석 (00으로 끝나는 경우) - 하지만 이미 완전한 가격인 경우는 제외
+           if (priceStr.endsWith('00') && priceStr.length == 3) {
+             priceStr = priceStr.slice(0, -2) + '000';
+           }
+           price = parseInt(priceStr);
+         }
+       }
+      
       
       // 무료배송 여부 판단
       const freeShipping = (title.includes("무료") || title.includes("무배") || title.includes("와우")) ? 'Y' : 'N';
+
+      let siteLink = `https://www.ppomppu.co.kr/zboard/view.php?id=${category}&no=${productId}`;
+      
+      let thumbnail = $(".board-contents").find('img').attr('src');
+      
       
       // 제목에서 가격 정보 제거
       title = this._cleanTitle(title);
+      
 
       const detailData = {
-        category: categoryTitle,
+        // category: categoryTitle,
         title: title,
         comment: comment,
         productLink: productLink,
         price: price,
         freeShipping: freeShipping,
+        siteLink: siteLink,
+        thumbnail: thumbnail
       };
       
       return detailData;
@@ -144,9 +169,7 @@ class Ppomppu extends BaseCrawler {
    */
   static _cleanTitle(title) {
     return title
-      .replace(/\[[^\]]*\]/g, '')      // 모든 대괄호와 내용 제거
-      .replace(/\s*\([^)]*\)\s*$/, '') // 마지막 괄호와 내용 제거 (가격 정보)
-      .replace(/^\s+|\s+$/g, '')       // 앞뒤 공백 제거
+      .replace(/\)\s*\d{1,2}\s*$/, ')') // 마지막 ) 다음에 숫자 1-2개 제거 (괄호 내용은 유지)
       .trim();
   }
 

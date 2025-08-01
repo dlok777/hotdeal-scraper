@@ -175,6 +175,10 @@ class HotdealScraper {
 
           // 상품 데이터 병합
           const productData = { ...product, ...detail };
+          // 상품 금액이 10원 밑이면 continue
+          // if(productData.price < 10) {
+          //   continue;
+          // }
 
           // 썸네일 이미지 S3 업로드
           let thumbnailUrl = null;
@@ -227,20 +231,21 @@ class HotdealScraper {
   async _saveProduct(productData, thumbnailUrl) {
     const sql = `
       INSERT INTO expertnote_channelProducts 
-      (channel_idx, channel_product_idx, category_title, seller_title, title, price, free_shipping, thumbnail, product_link) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (channel_idx, channel_product_idx, category_title, seller_title, title, price, free_shipping, thumbnail, product_link, site_link) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const values = [
       1, // channel_idx (뽐뿌는 1로 고정)
       productData.id,
-      productData.category || '',
+      productData.categoryTitle || '',
       productData.seller || '',
       productData.title || '',
       productData.price || 0,
       productData.freeShipping || 'N',
       thumbnailUrl || productData.thumbnail || '',
-      productData.productLink || ''
+      productData.productLink || '',
+      productData.siteLink || ''
     ];
 
     await this.db.query(sql, values);
@@ -251,6 +256,10 @@ class HotdealScraper {
  * 애플리케이션 진입점
  */
 (async () => {
+  // let ppomppu = await Ppomppu.getProductDetail('ppomppu', 640313);
+  // console.log(ppomppu);
+  // return;
+  
   const scraper = new HotdealScraper();
   await scraper.run();
 })();

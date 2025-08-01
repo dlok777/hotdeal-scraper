@@ -1,4 +1,4 @@
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, RestoreRequestFilterSensitiveLog } = require('@aws-sdk/client-s3');
 const axios = require('axios');
 const path = require('path');
 
@@ -112,9 +112,10 @@ class S3Uploader {
    * @private
    */
   async _uploadToS3(imageBuffer, originalUrl, folder) {
+    // return '';
     // 파일명 생성
     const fileName = this._generateFileName(originalUrl);
-    const yearMonth = new Date().toISOString().slice(0, 7); // YYYY-MM 형식
+    const yearMonth = new Date().toISOString().slice(0, 10); // YYYY-MM-dd 형식
     const s3Key = `${folder}/${yearMonth}/${fileName}`;
 
     // S3 업로드 파라미터
@@ -131,6 +132,7 @@ class S3Uploader {
 
     // 업로드된 파일의 URL 생성
     const s3Url = `https://${this.config.bucket}.s3.${this.config.region}.amazonaws.com/${s3Key}`;
+
     return s3Url;
   }
 
