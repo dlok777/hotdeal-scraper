@@ -32,7 +32,8 @@ class HotdealScraper {
     
     // 지원하는 크롤러 목록
     this.crawlers = {
-      ppomppu: Ppomppu
+      ppomppu: Ppomppu,
+      quasarzone: Quasarzone
       // gmarket: Gmarket,
       // coupang: Coupang
     };
@@ -104,7 +105,8 @@ class HotdealScraper {
 
       // 수집할 사이트 및 카테고리 목록
       const crawlTargets = [
-        { crawler: 'ppomppu', category: 'ppomppu' }
+        { crawler: 'ppomppu', category: 'ppomppu' },
+        { crawler: 'quasarzone', category: 'quasarzone' }
         // { crawler: 'gmarket', category: 'hotdeal' },
         // { crawler: 'coupang', category: 'rocket' }
       ];
@@ -156,7 +158,6 @@ class HotdealScraper {
     try {
       // 상품 목록 가져오기
       const products = await CrawlerClass.getProducts(category);
-      console.log(`📦 ${products.length}개 상품 발견`);
 
       // 각 상품 처리
       for (const product of products) {
@@ -266,7 +267,8 @@ class HotdealScraper {
   // return;
 
   // let quasarzone = await Quasarzone.getProductDetail(1831436);
-  // return;
+  // let quasarzone = await Quasarzone.getProducts(1831436);
+  
   const scraper = new HotdealScraper();
   await scraper.run();
 })();

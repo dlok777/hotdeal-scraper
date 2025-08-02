@@ -5,58 +5,36 @@ const BaseCrawler = require('./BaseCrawler');
 const fs = require('fs');
 
 /**
- * 뽐뿌 사이트 크롤러 클래스
- * BaseCrawler를 상속받아 뽐뿌 사이트의 핫딜 정보를 수집합니다.
+ * 퀘이사존 사이트 크롤러 클래스
+ * BaseCrawler를 상속받아 퀘이사존 사이트의 핫딜 정보를 수집합니다.
  */
 class Quasarzone extends BaseCrawler {
   /**
-   * 뽐뿌 상품 목록을 가져옵니다
-   * @param {string} category - 카테고리 ID (예: 'ppomppu')
+   * 퀘이사존 상품 목록을 가져옵니다
+   * @param {string} category - 카테고리 ID (퀘이사존에서는 사용하지 않음)
    * @returns {Promise<Array>} 상품 목록 배열
    */
   static async getProducts(category) {
     try {
-      const url = `https://www.ppomppu.co.kr/zboard/zboard.php?id=${category}`;
+      const url = `https://quasarzone.com/bbs/qb_saleinfo`;
       
       // 뽐뿌 사이트에서 HTML 가져오기 (EUC-KR 인코딩 처리)
       const res = await fetch(url);
-      const buffer = await res.arrayBuffer();
-      const html = iconv.decode(Buffer.from(buffer), 'euc-kr');
+      const html = await res.text();
       const $ = cheerio.load(html);
   
-      const list = $("#revolution_main_table").find('.baseList');
+      const list = $(".subject-link");
+      
       const products = [];
 
       // 각 상품 정보 파싱
       for(let item of list) {
-        const productId = $(item).find('.baseList-numb').text().trim();
-  
-        // 상품 ID가 없으면 스킵
-        if(!productId) {
-          continue;
-        }
-  
-        // 판매자 정보 파싱 (대괄호 제거)
-        const seller = $(item).find('.subject_preface').text().trim().replace(/[\[\]]/g, '');
-        
-        // 썸네일 이미지 URL
-        const thumbnail = $(item).find('.baseList-thumb img').attr('src');
-        
-        // 상품 제목 파싱 (b 태그 우선, 없으면 전체 텍스트)
-        let title = $(item).find('.baseList-title b').text().trim() || 
-                    $(item).find('.baseList-title').text().trim().replace(`[${seller}]`, '').trim();
-
-        // 제목 정리: 대괄호 및 가격 정보 제거
-        title = this._cleanTitle(title);
-        let categoryTitle = $(item).find('.baseList-small').text().trim().replace(/[\[\]]/g, '');
+        const href = $(item).attr('href');
+        const productId = href.split('/').pop().match(/\d+/)?.[0] || href.split('/').pop();
 
         const productData = {
           id: productId,
-          // title: title,
-          seller: seller,
-          // thumbnail: thumbnail,
-          category: category,
-          categoryTitle: categoryTitle
+          category: category
         };
 
         products.push(productData);  
@@ -70,12 +48,12 @@ class Quasarzone extends BaseCrawler {
   }
 
   /**
-   * 뽐뿌 상품 상세 정보를 가져옵니다
-   * @param {string} category - 카테고리 ID
+   * 퀘이사존 상품 상세 정보를 가져옵니다
+   * @param {string} category - 카테고리 ID (퀘이사존에서는 사용하지 않음)
    * @param {string} productId - 상품 ID
    * @returns {Promise<Object>} 상품 상세 정보 객체
    */
-  static async getProductDetail(productId) {
+  static async getProductDetail(category, productId) {
     try {
 
 
@@ -90,6 +68,10 @@ class Quasarzone extends BaseCrawler {
       fs.writeFileSync('quasarzone.html', html);
       const $ = cheerio.load(html);
       let label = $(".common-view-area .label").text().trim();
+
+      if(label != '진행중') {
+        return null;
+      }
       let title = $(".common-view-area .title").text().replace(label, "").trim();
       let seller = '';
       const sellerMatch = title.match(/^\[([^\]]+)\]/);
@@ -151,7 +133,7 @@ class Quasarzone extends BaseCrawler {
    * @returns {string} 크롤러 이름
    */
   static getCrawlerName() {
-    return 'ppomppu';
+    return 'quasarzone';
   }
 
   /**
@@ -159,19 +141,7 @@ class Quasarzone extends BaseCrawler {
    * @returns {Array<string>} 지원하는 카테고리 배열
    */
   static getSupportedCategories() {
-    return ['ppomppu', 'freeboard'];
-  }
-
-  /**
-   * 상품 제목을 정리하는 내부 메서드
-   * @param {string} title - 원본 제목
-   * @returns {string} 정리된 제목
-   * @private
-   */
-  static _cleanTitle(title) {
-    return title
-      .replace(/\)\s*\d{1,2}\s*$/, ')') // 마지막 ) 다음에 숫자 1-2개 제거 (괄호 내용은 유지)
-      .trim();
+    return ['quasarzone'];
   }
 
   // 하위 호환성을 위한 기존 메서드 유지 (Deprecated)
