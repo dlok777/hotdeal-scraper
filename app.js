@@ -15,6 +15,8 @@ const Ppomppu = require("./modules/Ppomppu");
 // TODO: 향후 추가될 크롤러들
 // const Gmarket = require("./modules/Gmarket");
 // const Coupang = require("./modules/Coupang");
+// 퀘이사존
+const Quasarzone = require("./modules/Quasarzone");
 
 // 유틸리티 모듈들
 const S3Uploader = require("./modules/S3Uploader");
@@ -231,12 +233,12 @@ class HotdealScraper {
   async _saveProduct(productData, thumbnailUrl) {
     const sql = `
       INSERT INTO expertnote_channelProducts 
-      (channel_idx, channel_product_idx, category_title, seller_title, title, price, free_shipping, thumbnail, product_link, site_link) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (channel_idx, channel_product_idx, category_title, seller_title, title, price, free_shipping, thumbnail, product_link, site_link, currency) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const values = [
-      1, // channel_idx (뽐뿌는 1로 고정)
+      productData.channel, // 뽐뿌: 1, 퀘이사존: 2
       productData.id,
       productData.categoryTitle || '',
       productData.seller || '',
@@ -245,7 +247,8 @@ class HotdealScraper {
       productData.freeShipping || 'N',
       thumbnailUrl || productData.thumbnail || '',
       productData.productLink || '',
-      productData.siteLink || ''
+      productData.siteLink || '',
+      productData.currency || 'KRW'
     ];
 
     await this.db.query(sql, values);
@@ -256,10 +259,14 @@ class HotdealScraper {
  * 애플리케이션 진입점
  */
 (async () => {
-  // let ppomppu = await Ppomppu.getProductDetail('ppomppu', 640313);
+  // let ppomppu = await Ppomppu.getProductDetail('ppomppu'
+  // 
+  // , 640313);
   // console.log(ppomppu);
   // return;
-  
+
+  // let quasarzone = await Quasarzone.getProductDetail(1831436);
+  // return;
   const scraper = new HotdealScraper();
   await scraper.run();
 })();

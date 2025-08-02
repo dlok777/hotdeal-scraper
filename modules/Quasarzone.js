@@ -8,7 +8,7 @@ const fs = require('fs');
  * 뽐뿌 사이트 크롤러 클래스
  * BaseCrawler를 상속받아 뽐뿌 사이트의 핫딜 정보를 수집합니다.
  */
-class Ppomppu extends BaseCrawler {
+class Quasarzone extends BaseCrawler {
   /**
    * 뽐뿌 상품 목록을 가져옵니다
    * @param {string} category - 카테고리 ID (예: 'ppomppu')
@@ -75,72 +75,70 @@ class Ppomppu extends BaseCrawler {
    * @param {string} productId - 상품 ID
    * @returns {Promise<Object>} 상품 상세 정보 객체
    */
-  static async getProductDetail(category, productId) {
+  static async getProductDetail(productId) {
     try {
-      const url = `https://www.ppomppu.co.kr/zboard/view.php?id=${category}&no=${productId}`;
+
+
+      const url = `https://quasarzone.com/bbs/qb_saleinfo/views/${productId}`;
 
       // 상세 페이지 HTML 가져오기
       const res = await fetch(url);
-      const buffer = await res.arrayBuffer();
-      const html = iconv.decode(Buffer.from(buffer), 'euc-kr');
+
+      // const buffer = await res.arrayBuffer();
+      // const html = iconv.decode(Buffer.from(buffer), 'euc-kr');
+      const html = await res.text();
+      fs.writeFileSync('quasarzone.html', html);
       const $ = cheerio.load(html);
+      let label = $(".common-view-area .label").text().trim();
+      let title = $(".common-view-area .title").text().replace(label, "").trim();
+      let seller = '';
+      const sellerMatch = title.match(/^\[([^\]]+)\]/);
+      if (sellerMatch) {
+        seller = sellerMatch[1]; // 대괄호 안의 내용을 seller로 저장
+        title = title.replace(/^\[[^\]]+\]\s*/, ''); // 대괄호 부분을 타이틀에서 제거
+      }
 
-      // 상세 정보 파싱
-      const categoryTitle = $("#topTitle .subject_preface").text().trim();
-      const comment = $("#comment").text().trim();
-      let title = $("#topTitle h1").text().trim()
-        .replace(categoryTitle, "").trim()
-      
-      const productLink = $(".topTitle-link a").attr('href') || $(".topTitle-link a").text().trim();
-      
-                    // 가격 정보 추출 (다양한 가격 형태 지원)
-       let priceMatch = title.match(/(\d{1,3}(?:,\d{3})*)\s*원/) || // 35,750원, 9,000 원
-                        title.match(/(\d+)만원/) || // 24만원
-                        title.match(/\((\d{1,3}(?:,\d{3})*)[\/,)]/); // (35,750/) 또는 (35,750,) 또는 (35,750)
-       
-       let price = 0;
-       if (priceMatch) {
-         let priceStr = priceMatch[1].replace(/,/g, '');
-         
-          // 만원 단위 처리
-         if (title.includes('만원')) {
-            price = parseInt(priceStr) * 10000;
-         } else {
-            // 39,00 같은 경우 39,000으로 해석 (00으로 끝나는 경우) - 하지만 이미 완전한 가격인 경우는 제외
-           if (priceStr.endsWith('00') && priceStr.length == 3) {
-             priceStr = priceStr.slice(0, -2) + '000';
-           }
-           price = parseInt(priceStr);
-         }
-       }
-      
-      
-      // 무료배송 여부 판단
-      const freeShipping = (title.includes("무료") || title.includes("무배") || title.includes("와우")) ? 'Y' : 'N';
+      let thumbnail = $('meta[property="og:image"]').attr('content');
 
-      let siteLink = `https://www.ppomppu.co.kr/zboard/view.php?id=${category}&no=${productId}`;
-      
-      let thumbnail = $(".board-contents").find('img').attr('src');
-      
-      
-      // 제목에서 가격 정보 제거
-      title = this._cleanTitle(title);
+      let price = $(".market-info-view-table").find('td').eq(2).text().trim();
+
+      let currency = 'KRW';
+
+      if (price.includes('USD') || price.includes('$')) {
+        currency = 'USD';
+      }
+
+       // price에서 숫자만 추출 (콤마, 소수점 포함)
+      const priceNumber = price.replace(/[^\d.,]/g, '').replace(',', '');
+      const cleanPrice = parseFloat(priceNumber) || 0;
+
+      let shippingType = $(".market-info-view-table").find('td').eq(3).text().trim();
+
+      let freeShipping = 'N';
+      if (shippingType.includes('무료')) {
+        freeShipping = 'Y';
+      }
+
+      let categoryTitle = $(".ca_name").text().trim();
+
+      let productLink = $(".market-info-view-table").find('td').eq(0).text().trim();
+
+      let siteLink = `https://quasarzone.com/bbs/qb_saleinfo/views/${productId}`;
       
 
-      const detailData = {
-        // category: categoryTitle,
-        id: productId,
-        channel: 1,
+      let detailData = {
+        channel: 2,
+        label: label,
         title: title,
-        comment: comment,
-        productLink: productLink,
-        price: price,
-        freeShipping: freeShipping,
-        siteLink: siteLink,
+        seller: seller,
         thumbnail: thumbnail,
-        currency: 'KRW'
-      };
-      
+        price: cleanPrice,
+        currency: currency,
+        freeShipping: freeShipping,
+        categoryTitle: categoryTitle,
+        productLink: productLink,
+        siteLink: siteLink,
+      }
       return detailData;
     } catch (error) {
       console.error(`${this.getCrawlerName()} 상품 상세정보 수집 오류:`, error);
@@ -190,4 +188,4 @@ class Ppomppu extends BaseCrawler {
   }
 }
 
-module.exports = Ppomppu;
+module.exports = Quasarzone;
