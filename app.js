@@ -47,8 +47,21 @@ class HotdealScraper {
   _loadConfig() {
     try {
       const configPath = path.resolve(__dirname, 'config.json');
-      const configData = fs.readFileSync(configPath, 'utf8');
-      return JSON.parse(configData);
+      let fileConfig = {};
+      if (fs.existsSync(configPath)) {
+        const configData = fs.readFileSync(configPath, 'utf8');
+        fileConfig = JSON.parse(configData);
+      }
+
+      // Docker/CI 환경에서는 환경변수 우선으로 설정을 주입한다.
+      return {
+        host: process.env.DB_HOST || fileConfig.host,
+        user: process.env.DB_USER || fileConfig.user,
+        password: process.env.DB_PASSWORD || fileConfig.password,
+        database: process.env.DB_NAME || fileConfig.database,
+        access_key_id: process.env.AWS_ACCESS_KEY_ID || fileConfig.access_key_id,
+        secret_access_key: process.env.AWS_SECRET_ACCESS_KEY || fileConfig.secret_access_key
+      };
     } catch (error) {
       console.error('설정 파일 로드 실패:', error);
       process.exit(1);

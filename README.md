@@ -69,6 +69,52 @@ hotdeal-scraper/
 node app.js
 ```
 
+## 🐳 Docker Compose로 10분 주기 실행
+
+이 프로젝트는 `docker-compose.yml`로 컨테이너를 상시 실행하고, 내부 스케줄러가 `app.js`를 10분(600초)마다 실행하도록 구성되어 있습니다.
+
+### 1) 환경변수 파일 준비
+
+```bash
+cp .env.example .env
+```
+
+`.env`에 DB/AWS 값을 입력합니다:
+
+```env
+DB_HOST=your-database-host
+DB_USER=your-database-user
+DB_PASSWORD=your-database-password
+DB_NAME=your-database-name
+AWS_ACCESS_KEY_ID=your-aws-access-key-id
+AWS_SECRET_ACCESS_KEY=your-aws-secret-access-key
+RUN_INTERVAL_SECONDS=600
+```
+
+### 2) 실행
+
+```bash
+docker compose up -d --build
+```
+
+### 3) 로그 확인
+
+```bash
+docker compose logs -f hotdeal-scraper
+```
+
+### 4) 중지
+
+```bash
+docker compose down
+```
+
+### 운영 권장 사항
+
+- 민감정보(DB, AWS 키)는 `config.json` 대신 `.env`(또는 배포 환경 Secret)로 관리
+- 컨테이너 시간대는 `Asia/Seoul`로 설정됨 (`docker-compose.yml`)
+- 주기는 `RUN_INTERVAL_SECONDS`로 조정 가능 (기본 600초 = 10분)
+
 ## 🔧 사용법
 
 ### 기본 실행

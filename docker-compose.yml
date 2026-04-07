@@ -1,0 +1,16 @@
+services:
+  hotdeal-scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hotdeal-scraper
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Seoul
+      RUN_INTERVAL_SECONDS: 600
+      DB_HOST: ${DB_HOST}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
