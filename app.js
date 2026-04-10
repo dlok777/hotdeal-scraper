@@ -21,6 +21,8 @@ const Quasarzone = require("./modules/Quasarzone");
 // 루리웹
 const Ruriweb = require("./modules/Ruriweb");
 
+// 조드
+const Zod = require("./modules/Zod");
 // 유틸리티 모듈들
 const S3Uploader = require("./modules/S3Uploader");
 
@@ -38,6 +40,7 @@ class HotdealScraper {
       ppomppu: Ppomppu,
       quasarzone: Quasarzone,
       ruriweb: Ruriweb,
+      zod: Zod,
       // gmarket: Gmarket,
       // coupang: Coupang
     };
@@ -127,6 +130,7 @@ class HotdealScraper {
         { crawler: "ppomppu", category: "ppomppu" },
         { crawler: "quasarzone", category: "quasarzone" },
         { crawler: "ruriweb", category: "ruriweb" },
+        { crawler: "zod", category: "zod" },
         // { crawler: 'gmarket', category: 'hotdeal' },
         // { crawler: 'coupang', category: 'rocket' }
       ];

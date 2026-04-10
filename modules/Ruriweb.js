@@ -21,7 +21,6 @@ class Ruriweb extends BaseCrawler {
       // 루리웹 게시판 HTML 가져오기
       const res = await fetch(url);
       const html = await res.text();
-      fs.writeFileSync("ruriweb.html", html);
       const $ = cheerio.load(html);
       const products = [];
 
@@ -35,7 +34,11 @@ class Ruriweb extends BaseCrawler {
           continue;
         }
 
-        const subjectText = $(row).find("td.subject .subject_link").first().text().trim();
+        const subjectText = $(row)
+          .find("td.subject .subject_link")
+          .first()
+          .text()
+          .trim();
         const sellerMatch = subjectText.match(/^\s*\[([^\]]+)\]/);
         const seller = sellerMatch ? sellerMatch[1].trim() : "";
         const categoryTitle = $(row).find("td.divsn a").first().text().trim();
@@ -68,7 +71,6 @@ class Ruriweb extends BaseCrawler {
       // 상세 페이지 HTML 가져오기
       const res = await fetch(url);
       const html = await res.text();
-      fs.writeFileSync("product.html", html);
       const $ = cheerio.load(html);
 
       const title =
