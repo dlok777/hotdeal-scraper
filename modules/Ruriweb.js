@@ -71,6 +71,7 @@ class Ruriweb extends BaseCrawler {
       // 상세 페이지 HTML 가져오기
       const res = await fetch(url);
       const html = await res.text();
+      fs.writeFileSync("ruriweb.html", html);
       const $ = cheerio.load(html);
 
       const title =
@@ -95,19 +96,17 @@ class Ruriweb extends BaseCrawler {
 
       // 제목/본문에서 가격 추출
       const priceText = `${title} ${comment}`;
-      const priceMatch =
-        priceText.match(/(\d{1,3}(?:,\d{3})*)\s*원/) ||
-        priceText.match(/(\d+)만원/) ||
-        priceText.match(/\((\d{1,3}(?:,\d{3})*)[\/,)]/);
+      const wonMatch = priceText.match(/(\d{1,3}(?:,\d{3})*)\s*원/);
+      const manwonMatch = priceText.match(/(\d+)\s*만원/);
+      const parenMatch = priceText.match(/\((\d{1,3}(?:,\d{3})*)[\/,)]/);
 
       let price = 0;
-      if (priceMatch) {
-        let priceStr = priceMatch[1].replace(/,/g, "");
-        if (priceText.includes("만원")) {
-          price = parseInt(priceStr, 10) * 10000;
-        } else {
-          price = parseInt(priceStr, 10) || 0;
-        }
+      if (wonMatch) {
+        price = parseInt(wonMatch[1].replace(/,/g, ""), 10) || 0;
+      } else if (manwonMatch) {
+        price = (parseInt(manwonMatch[1], 10) || 0) * 10000;
+      } else if (parenMatch) {
+        price = parseInt(parenMatch[1].replace(/,/g, ""), 10) || 0;
       }
 
       const freeShipping =
