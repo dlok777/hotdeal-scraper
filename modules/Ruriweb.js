@@ -39,6 +39,28 @@ class Ruriweb extends BaseCrawler {
     );
   }
 
+  static async _gotoWithRetry(page, url, selector) {
+    const attempts = [
+      { waitUntil: "domcontentloaded", timeout: 45000 },
+      { waitUntil: "load", timeout: 90000 },
+    ];
+
+    let lastError = null;
+    for (const option of attempts) {
+      try {
+        await page.goto(url, option);
+        if (selector) {
+          await page.waitForSelector(selector, { timeout: 30000 });
+        }
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError;
+  }
+
   /**
    * 뽐뿌 상품 목록을 가져옵니다
    * @param {string} category - 카테고리 ID (예: 'ppomppu')
@@ -59,10 +81,11 @@ class Ruriweb extends BaseCrawler {
       await page.setUserAgent(
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
       );
-      await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
-      await page.waitForSelector("table.board_list_table tbody tr", {
-        timeout: 30000,
-      });
+      await this._gotoWithRetry(
+        page,
+        url,
+        "table.board_list_table tbody tr, #board_list .table_body",
+      );
 
       const html = await page.content();
       fs.writeFileSync("ruriweb-list.html", html);
@@ -129,10 +152,11 @@ class Ruriweb extends BaseCrawler {
       await page.setUserAgent(
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
       );
-      await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
-      await page.waitForSelector(".subject_inner_text, .board_main_view", {
-        timeout: 30000,
-      });
+      await this._gotoWithRetry(
+        page,
+        url,
+        ".subject_inner_text, .board_main_view, #board_read",
+      );
       const html = await page.content();
       fs.writeFileSync("ruriweb.html", html);
       const $ = cheerio.load(html);
