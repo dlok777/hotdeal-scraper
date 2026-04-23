@@ -9,6 +9,7 @@ const mysql = require("mysql2/promise");
 const path = require("path");
 const fs = require("fs");
 const log = require("./modules/Log");
+const { classifyCategory } = require("./lib/categoryClassifier");
 
 // 크롤러 모듈들
 const Ppomppu = require("./modules/Ppomppu");
@@ -267,16 +268,23 @@ class HotdealScraper {
    * @private
    */
   async _saveProduct(productData, thumbnailUrl) {
+    const aiCategory = classifyCategory({
+      title: productData.title,
+      sellerTitle: productData.seller,
+      categoryTitle: productData.categoryTitle,
+    });
+
     const sql = `
       INSERT INTO expertnote_channelProducts 
-      (channel_idx, channel_product_idx, category_title, seller_title, title, price, free_shipping, thumbnail, product_link, site_link, currency) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (channel_idx, channel_product_idx, category_title, ai_category, seller_title, title, price, free_shipping, thumbnail, product_link, site_link, currency) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const values = [
       productData.channel, // 뽐뿌: 1, 퀘이사존: 2
       productData.id,
       productData.categoryTitle || "",
+      aiCategory,
       productData.seller || "",
       productData.title || "",
       productData.price || 0,
