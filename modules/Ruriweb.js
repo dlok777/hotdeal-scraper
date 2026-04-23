@@ -1,26 +1,71 @@
-const fetch = require("node-fetch");
 const cheerio = require("cheerio");
-const iconv = require("iconv-lite");
 const BaseCrawler = require("./BaseCrawler");
 const fs = require("fs");
+const puppeteer = require("puppeteer-core");
 
 /**
  * 루리웹 사이트 크롤러 클래스
  * BaseCrawler를 상속받아 루리웹 사이트의 핫딜 정보를 수집합니다.
  */
 class Ruriweb extends BaseCrawler {
+  static _resolveBrowserExecutable() {
+    const windowsCandidates = [];
+    if (process.platform === "win32") {
+      windowsCandidates.push(
+        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+        "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+        "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+      );
+    }
+
+    const candidates = [
+      process.env.PUPPETEER_EXECUTABLE_PATH,
+      ...windowsCandidates,
+      "/usr/bin/chromium-browser",
+      "/usr/bin/chromium",
+      "/usr/bin/google-chrome-stable",
+      "/usr/bin/google-chrome",
+    ].filter(Boolean);
+
+    for (const executablePath of candidates) {
+      if (fs.existsSync(executablePath)) {
+        return executablePath;
+      }
+    }
+
+    throw new Error(
+      "Chromium/Chrome 실행 파일을 찾지 못했습니다. PUPPETEER_EXECUTABLE_PATH를 설정하거나 서버에 chromium을 설치하세요.",
+    );
+  }
+
   /**
    * 뽐뿌 상품 목록을 가져옵니다
    * @param {string} category - 카테고리 ID (예: 'ppomppu')
    * @returns {Promise<Array>} 상품 목록 배열
    */
   static async getProducts() {
+    let browser = null;
     try {
       const url = `https://bbs.ruliweb.com/market/board/1020`;
+      const executablePath = this._resolveBrowserExecutable();
+      browser = await puppeteer.launch({
+        executablePath,
+        headless: true,
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      });
 
-      // 루리웹 게시판 HTML 가져오기
-      const res = await fetch(url);
-      const html = await res.text();
+      const page = await browser.newPage();
+      await page.setUserAgent(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+      );
+      await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
+      await page.waitForSelector("table.board_list_table tbody tr", {
+        timeout: 30000,
+      });
+
+      const html = await page.content();
+      fs.writeFileSync("ruriweb-list.html", html);
       const $ = cheerio.load(html);
       const products = [];
 
@@ -55,6 +100,10 @@ class Ruriweb extends BaseCrawler {
     } catch (error) {
       console.error(`${this.getCrawlerName()} 상품 목록 수집 오류:`, error);
       return [];
+    } finally {
+      if (browser) {
+        await browser.close();
+      }
     }
   }
 
@@ -65,12 +114,26 @@ class Ruriweb extends BaseCrawler {
    * @returns {Promise<Object>} 상품 상세 정보 객체
    */
   static async getProductDetail(category, productId) {
+    let browser = null;
     try {
       const url = `https://bbs.ruliweb.com/market/board/1020/read/${productId}?`;
+      const executablePath = this._resolveBrowserExecutable();
+      browser = await puppeteer.launch({
+        executablePath,
+        headless: true,
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      });
 
       // 상세 페이지 HTML 가져오기
-      const res = await fetch(url);
-      const html = await res.text();
+      const page = await browser.newPage();
+      await page.setUserAgent(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+      );
+      await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
+      await page.waitForSelector(".subject_inner_text, .board_main_view", {
+        timeout: 30000,
+      });
+      const html = await page.content();
       fs.writeFileSync("ruriweb.html", html);
       const $ = cheerio.load(html);
 
@@ -132,6 +195,10 @@ class Ruriweb extends BaseCrawler {
     } catch (error) {
       console.error(`${this.getCrawlerName()} 상품 상세정보 수집 오류:`, error);
       return null;
+    } finally {
+      if (browser) {
+        await browser.close();
+      }
     }
   }
 
