@@ -1,20 +1,10 @@
-const { S3Client, PutObjectCommand, RestoreRequestFilterSensitiveLog } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const axios = require('axios');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 
-/**
- * AWS S3 이미지 업로드 유틸리티 클래스
- * 이미지를 다운로드하여 S3에 업로드하는 기능을 제공합니다.
- */
 class S3Uploader {
-  /**
-   * S3Uploader 생성자
-   * @param {Object} config - AWS 설정 객체
-   * @param {string} config.accessKeyId - AWS Access Key ID
-   * @param {string} config.secretAccessKey - AWS Secret Access Key
-   * @param {string} config.region - AWS 리전 (기본값: 'ap-northeast-2')
-   * @param {string} config.bucket - S3 버킷 이름
-   */
   constructor(config) {
     this.config = {
       region: config.region || 'ap-northeast-2',
@@ -32,126 +22,109 @@ class S3Uploader {
   }
 
   /**
-   * 이미지 URL에서 이미지를 다운로드하여 S3에 업로드
-   * @param {string} imageUrl - 업로드할 이미지 URL
-   * @param {string} folder - S3 내 폴더 경로 (기본값: 'images')
-   * @returns {Promise<string|null>} 업로드된 S3 URL, 실패시 null
+   * 이미지 URL을 다운로드 → 로컬 임시 파일 저장 → S3 업로드 → 임시 파일 삭제
+   * @param {string} imageUrl
+   * @param {string} folder
+   * @param {Object} downloadHeaders - 다운로드 요청에 추가할 HTTP 헤더 (Referer 등)
+   * @returns {Promise<string|null>}
    */
-  async uploadImageFromUrl(imageUrl, folder = 'images') {
+  async uploadImageFromUrl(imageUrl, folder = 'images', downloadHeaders = {}) {
+    if (!imageUrl || imageUrl.trim() === '') return null;
+
+    const normalizedUrl = this._normalizeUrl(imageUrl);
+    let tempPath = null;
+
     try {
-      // URL 유효성 검사 및 정규화
-      if (!imageUrl || imageUrl.trim() === '') {
-        console.warn('S3Uploader: 유효하지 않은 이미지 URL입니다.');
-        return null;
-      }
+      const { filePath, contentType } = await this._downloadImageToFile(normalizedUrl, downloadHeaders);
+      tempPath = filePath;
 
-      const normalizedUrl = this._normalizeUrl(imageUrl);
-      
-      // 이미지 다운로드
-      const imageBuffer = await this._downloadImage(normalizedUrl);
-      if (!imageBuffer) {
-        return null;
-      }
-
-      // S3에 업로드
-      const s3Url = await this._uploadToS3(imageBuffer, normalizedUrl, folder);
+      const imageBuffer = fs.readFileSync(tempPath);
+      const s3Url = await this._uploadToS3(imageBuffer, normalizedUrl, folder, contentType);
       return s3Url;
-
     } catch (error) {
       console.error('S3Uploader: 이미지 업로드 실패:', error.message);
       return null;
+    } finally {
+      if (tempPath && fs.existsSync(tempPath)) {
+        try { fs.unlinkSync(tempPath); } catch (_) {}
+      }
     }
   }
 
   /**
-   * URL을 정규화 (프로토콜 추가 등)
-   * @param {string} url - 원본 URL
-   * @returns {string} 정규화된 URL
-   * @private
+   * 이미 다운로드된 Buffer를 S3에 직접 업로드
+   * @param {Buffer} buffer
+   * @param {string} originalUrl - 파일명 생성에 사용
+   * @param {string} folder
+   * @param {string} contentType
+   * @returns {Promise<string|null>}
    */
-  _normalizeUrl(url) {
-    if (url.startsWith('//')) {
-      return 'https:' + url;
-    } else if (!url.startsWith('http')) {
-      return 'https://' + url;
+  async uploadImageFromBuffer(buffer, originalUrl, folder = 'images', contentType = 'image/jpeg') {
+    try {
+      return await this._uploadToS3(buffer, originalUrl, folder, contentType);
+    } catch (error) {
+      console.error('S3Uploader: 버퍼 업로드 실패:', error.message);
+      return null;
     }
+  }
+
+  _normalizeUrl(url) {
+    if (url.startsWith('//')) return 'https:' + url;
+    if (!url.startsWith('http')) return 'https://' + url;
     return url;
   }
 
   /**
-   * 이미지를 다운로드하여 버퍼로 반환
-   * @param {string} url - 이미지 URL
-   * @returns {Promise<Buffer|null>} 이미지 버퍼, 실패시 null
+   * 이미지를 다운로드해 임시 파일로 저장 후 경로와 content-type 반환
    * @private
    */
-  async _downloadImage(url) {
-    try {
-      const response = await axios({
-        url: url,
-        method: 'GET',
-        responseType: 'arraybuffer',
-        timeout: 10000, // 10초 타임아웃
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
+  async _downloadImageToFile(url, extraHeaders = {}) {
+    const response = await axios.get(url, {
+      responseType: 'arraybuffer',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        ...extraHeaders,
+      },
+    });
 
-      return Buffer.from(response.data);
-    } catch (error) {
-      console.error(`S3Uploader: 이미지 다운로드 실패 (${url}):`, error.message);
-      return null;
+    const contentType = response.headers['content-type'] || '';
+    if (!contentType.startsWith('image/')) {
+      throw new Error(`이미지 아닌 응답 (${contentType})`);
     }
+
+    const ext = path.extname(url.split('?')[0]) || '.jpg';
+    const tempPath = path.join(
+      os.tmpdir(),
+      `hotdeal_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`
+    );
+
+    fs.writeFileSync(tempPath, Buffer.from(response.data));
+    console.log(`S3Uploader: 임시 파일 저장 완료 (${response.data.byteLength}B) → ${tempPath}`);
+
+    return { filePath: tempPath, contentType };
   }
 
-  /**
-   * 이미지를 S3에 업로드
-   * @param {Buffer} imageBuffer - 이미지 버퍼
-   * @param {string} originalUrl - 원본 이미지 URL
-   * @param {string} folder - S3 폴더 경로
-   * @returns {Promise<string>} S3 URL
-   * @private
-   */
-  async _uploadToS3(imageBuffer, originalUrl, folder) {
-    // return '';
-    // 파일명 생성
+  async _uploadToS3(imageBuffer, originalUrl, folder, contentType) {
     const fileName = this._generateFileName(originalUrl);
-    const yearMonth = new Date().toISOString().slice(0, 10); // YYYY-MM-dd 형식
-    const s3Key = `${folder}/${yearMonth}/${fileName}`;
+    const date = new Date().toISOString().slice(0, 10);
+    const s3Key = `${folder}/${date}/${fileName}`;
 
-    // S3 업로드 파라미터
-    const uploadParams = {
+    await this.s3Client.send(new PutObjectCommand({
       Bucket: this.config.bucket,
       Key: s3Key,
       Body: imageBuffer,
-      ContentType: this._getContentType(originalUrl),
+      ContentType: contentType || this._getContentType(originalUrl),
       ACL: 'public-read'
-    };
+    }));
 
-    // S3에 업로드
-    await this.s3Client.send(new PutObjectCommand(uploadParams));
-
-    // 업로드된 파일의 URL 생성
-    const s3Url = `https://${this.config.bucket}.s3.${this.config.region}.amazonaws.com/${s3Key}`;
-
-    return s3Url;
+    return `https://${this.config.bucket}.s3.${this.config.region}.amazonaws.com/${s3Key}`;
   }
 
-  /**
-   * 고유한 파일명 생성
-   * @param {string} originalUrl - 원본 URL
-   * @returns {string} 생성된 파일명
-   * @private
-   */
   _generateFileName(originalUrl) {
-    // 원본 파일명에서 쿼리스트링 제거
+    // 쿼리스트링 제거 후 파일명 추출
     let originalName = path.basename(originalUrl).split('?')[0];
-    
-    // 파일 확장자 확인 및 추가
-    if (!originalName.includes('.')) {
-      originalName += '.jpg';
-    }
+    if (!originalName.includes('.')) originalName += '.jpg';
 
-    // 랜덤값과 타임스탬프로 고유 파일명 생성
     const timestamp = Date.now();
     const random = Math.floor(Math.random() * 1000000);
     const extension = path.extname(originalName);
@@ -160,33 +133,14 @@ class S3Uploader {
     return `${timestamp}_${random}_${nameWithoutExt}${extension}`;
   }
 
-  /**
-   * 파일 확장자에 따른 Content-Type 반환
-   * @param {string} url - 파일 URL
-   * @returns {string} Content-Type
-   * @private
-   */
   _getContentType(url) {
-    const extension = path.extname(url).toLowerCase();
-    const mimeTypes = {
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.gif': 'image/gif',
-      '.webp': 'image/webp'
-    };
-    return mimeTypes[extension] || 'image/jpeg';
+    const ext = path.extname(url.split('?')[0]).toLowerCase();
+    return { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+             '.gif': 'image/gif', '.webp': 'image/webp' }[ext] || 'image/jpeg';
   }
 
-  /**
-   * 설정 정보 반환
-   * @returns {Object} 설정 객체 (민감한 정보 제외)
-   */
   getConfig() {
-    return {
-      region: this.config.region,
-      bucket: this.config.bucket
-    };
+    return { region: this.config.region, bucket: this.config.bucket };
   }
 }
 

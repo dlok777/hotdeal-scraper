@@ -24,6 +24,12 @@ const Ruriweb = require("./modules/Ruriweb");
 
 // 조드
 const Zod = require("./modules/Zod");
+
+// 어미새
+const Eomisae = require("./modules/Eomisae");
+
+// 클리앙
+const Clien = require("./modules/Clien");
 // 유틸리티 모듈들
 const S3Uploader = require("./modules/S3Uploader");
 
@@ -38,10 +44,12 @@ class HotdealScraper {
 
     // 지원하는 크롤러 목록
     this.crawlers = {
-      ppomppu: Ppomppu,
-      quasarzone: Quasarzone,
-      ruriweb: Ruriweb,
-      zod: Zod,
+      // ppomppu: Ppomppu,
+      // quasarzone: Quasarzone,
+      // ruriweb: Ruriweb,
+      // zod: Zod,
+      // eomisae: Eomisae,
+      clien: Clien,
       // gmarket: Gmarket,
       // coupang: Coupang
     };
@@ -128,10 +136,12 @@ class HotdealScraper {
 
       // 수집할 사이트 및 카테고리 목록
       const crawlTargets = [
-        { crawler: "ppomppu", category: "ppomppu" },
-        { crawler: "quasarzone", category: "quasarzone" },
-        { crawler: "ruriweb", category: "ruriweb" },
-        { crawler: "zod", category: "zod" },
+        // { crawler: "ppomppu", category: "ppomppu" },
+        // { crawler: "quasarzone", category: "quasarzone" },
+        // { crawler: "ruriweb", category: "ruriweb" },
+        // { crawler: "zod", category: "zod" },
+        // { crawler: "eomisae", category: "eomisae" },
+        { crawler: "clien", category: "clien" },
         // { crawler: 'gmarket', category: 'hotdeal' },
         // { crawler: 'coupang', category: 'rocket' }
       ];
@@ -188,7 +198,7 @@ class HotdealScraper {
 
     try {
       // 상품 목록 가져오기
-      const products = await CrawlerClass.getProducts(category);
+      const products = (await CrawlerClass.getProducts(category)).reverse();
 
       // 각 상품 처리
       for (const product of products) {
@@ -268,15 +278,22 @@ class HotdealScraper {
    * @private
    */
   async _saveProduct(productData, thumbnailUrl) {
+    // title 앞에 [seller_title] 형식이 있으면 제거
+    let title = productData.title || '';
+    if (productData.seller) {
+      const escaped = productData.seller.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      title = title.replace(new RegExp(`^\\s*\\[${escaped}\\]\\s*`), '').trim();
+    }
+
     const aiCategory = classifyCategory({
-      title: productData.title,
+      title: title,
       sellerTitle: productData.seller,
       categoryTitle: productData.categoryTitle,
     });
 
     const sql = `
-      INSERT INTO expertnote_channelProducts 
-      (channel_idx, channel_product_idx, category_title, ai_category, seller_title, title, price, free_shipping, thumbnail, product_link, site_link, currency) 
+      INSERT INTO expertnote_channelProducts
+      (channel_idx, channel_product_idx, category_title, ai_category, seller_title, title, price, free_shipping, thumbnail, product_link, site_link, currency)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
@@ -286,7 +303,7 @@ class HotdealScraper {
       productData.categoryTitle || "",
       aiCategory,
       productData.seller || "",
-      productData.title || "",
+      title,
       productData.price || 0,
       productData.freeShipping || "N",
       thumbnailUrl || productData.thumbnail || "",
@@ -314,6 +331,7 @@ class HotdealScraper {
 
   // let ruriweb = await Ruriweb.getProducts();
   // let product = await Ruriweb.getProductDetail("", 103217);
+  
   // console.log(ruriweb);
 
   const scraper = new HotdealScraper();

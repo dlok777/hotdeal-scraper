@@ -94,3 +94,5 @@ coverage/
 # Lock files (optional - some teams prefer to include these)
 package-lock.json
 yarn.lock
+
+*.html
