@@ -44,11 +44,11 @@ class HotdealScraper {
 
     // 지원하는 크롤러 목록
     this.crawlers = {
-      // ppomppu: Ppomppu,
-      // quasarzone: Quasarzone,
+      ppomppu: Ppomppu,
+      quasarzone: Quasarzone,
       // ruriweb: Ruriweb,
-      // zod: Zod,
-      // eomisae: Eomisae,
+      zod: Zod,
+      eomisae: Eomisae,
       clien: Clien,
       // gmarket: Gmarket,
       // coupang: Coupang
@@ -136,11 +136,11 @@ class HotdealScraper {
 
       // 수집할 사이트 및 카테고리 목록
       const crawlTargets = [
-        // { crawler: "ppomppu", category: "ppomppu" },
-        // { crawler: "quasarzone", category: "quasarzone" },
+        { crawler: "ppomppu", category: "ppomppu" },
+        { crawler: "quasarzone", category: "quasarzone" },
         // { crawler: "ruriweb", category: "ruriweb" },
-        // { crawler: "zod", category: "zod" },
-        // { crawler: "eomisae", category: "eomisae" },
+        { crawler: "zod", category: "zod" },
+        { crawler: "eomisae", category: "eomisae" },
         { crawler: "clien", category: "clien" },
         // { crawler: 'gmarket', category: 'hotdeal' },
         // { crawler: 'coupang', category: 'rocket' }
